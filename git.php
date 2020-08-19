@@ -25,20 +25,23 @@ class git extends \Cz\Git\GitRepository
     public function getCommitFile(string $filename) : array
     {
         $this->begin();
-        exec('git log --format="%H;%ct;%an;%s" ' . $filename . " 2>&1", $output);
+        exec('git log --format="%H;%ct;%an;%s" -- "' . $filename . '" 2>&1', $output);
         $this->end();
 
         $commits = [];
 
         foreach($output as $commitData)
         {
-            list($commit, $timestamp, $author, $message) = \explode(';', $commitData, 4);
-            $commits[] = [
-                'commit' => $commit,
-                'timestamp' => $timestamp,
-                'author' => $author,
-                'message' => $message
-            ];
+            if(strpos($commitData, ';') !== false)
+            {
+                list($commit, $timestamp, $author, $message) = \explode(';', $commitData, 4);
+                $commits[] = [
+                    'commit' => $commit,
+                    'timestamp' => $timestamp,
+                    'author' => $author,
+                    'message' => $message
+                ];
+            }
         }
 
         return $commits;
@@ -90,7 +93,7 @@ class git extends \Cz\Git\GitRepository
     public function getCommitFileAtDate(string $filename, string $date) : string
     {
         $this->begin();
-        exec('git log -1 --format="%H;%ct;%s" --until ' . $date . ' -- "' . $filename . '"');
+        exec('git log -1 --format="%H;%ct;%s" --until ' . $date . ' -- "' . $filename . '"', $output);
         $this->end();
 
         return $output[0];
@@ -105,5 +108,40 @@ class git extends \Cz\Git\GitRepository
     public function getCommitAtDate(string $date) : string
     {
         return $this->getCommitFileAtDate("", $date);
+    }
+
+    /**
+     * Retrieve all Files recursively that exists in this Repository.
+     *
+     * @return array
+     */
+    public function getAllFiles() : array
+    {
+        $this->begin();
+        exec('git ls-files 2>&1', $output);
+        $this->end();
+
+        $allFiles = [];
+
+        foreach($output as $line)
+        {
+            $l = $line;
+            $r = &$allFiles;
+            $k = '.';
+            while( ($pos = strpos($l, '/')) !== false )
+            {
+                if($k != '.')
+                    $r = &$r[$k];
+
+                $k = substr($l, 0, $pos);
+                if(!array_key_exists($k, $r))
+                    $r[$k] = [];
+
+                $l = substr($l, $pos+1); 
+            }
+            $r[$k][] = $l;
+        }
+
+        return $allFiles;
     }
 }
