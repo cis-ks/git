@@ -241,11 +241,43 @@ class git extends \Cz\Git\GitRepository
 
         foreach($allPrefilteredFiles as $file)
         {
-            if( ($regex and preg_match('/' . str_replace('/', '\/', $sarch). '/', $file))
+            if( ($regex and preg_match('/' . str_replace('/', '\/', $search). '/', $file))
              or (!$regex and strpos($file, $search)) )
                 $allFiles[] = $file;
         }
 
         return ($returnflat) ? $allFiles : $this->_flatToArray($allFiles);
+    }
+
+    /**
+     * Check if a given GIT-Repository is initialized
+     *
+     * @return bool
+     */
+    public function isInitalized(): bool
+    {
+        $this->begin();
+        exec($this->_binary . ' status', $output);
+        $this->end();
+
+        if (preg_grep('/fatal: not a git repository/', $output)) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /**
+     * Function to check if Working Directory is the root directory.
+     *
+     * @return bool
+     */
+    public function isRootDirectoy(): bool
+    {
+        $this->begin();
+        $gitexists = is_dir('.git');
+        $this->end();
+
+        return $gitexists;
     }
 }
