@@ -1,4 +1,9 @@
-<?php namespace cis\git;
+<?php
+
+namespace cis\git;
+
+use Cz\Git\GitRepository;
+use function explode;
 
 /**
  * git-class to extend the CZproject Git-Repository-Class
@@ -14,7 +19,7 @@
  * @version 1.0.0
  * @requires Cz\Git\GitRepository
  */
-class git extends \Cz\Git\GitRepository
+class git extends GitRepository
 {
     protected $_binary = 'git';
 
@@ -25,25 +30,25 @@ class git extends \Cz\Git\GitRepository
      * @param array $gitoutput
      * @return array
      */
-    protected function _flatToArray(array $gitoutput) : array
+    protected function _flatToArray(array $gitoutput): array
     {
         $return = [];
 
-        foreach($gitoutput as $line)
-        {
+        foreach ($gitoutput as $line) {
             $l = $line;
             $r = &$return;
             $k = '.';
-            while( ($pos = strpos($l, '/')) !== false )
-            {
-                if($k != '.')
+            while (($pos = strpos($l, '/')) !== false) {
+                if ($k != '.') {
                     $r = &$r[$k];
+                }
 
                 $k = substr($l, 0, $pos);
-                if(!array_key_exists($k, $r))
+                if (!array_key_exists($k, $r)) {
                     $r[$k] = [];
+                }
 
-                $l = substr($l, $pos+1);
+                $l = substr($l, $pos + 1);
             }
             $r[$k][] = $l;
         }
@@ -60,12 +65,17 @@ class git extends \Cz\Git\GitRepository
      * @param string $binary
      * @return boolean
      */
-    public function setBinary(string $binary) : bool
+    public function setBinary(string $binary): bool
     {
         $sanitize = (strpos($binary, ';') === false);
 
-        if(!array_reduce($sanitize, function ($x,$y) {return $x && $y;}, true))
+        if (
+            !array_reduce($sanitize, function ($x, $y) {
+                return $x && $y;
+            }, true)
+        ) {
             return false;
+        }
 
         $this->_binary = $binary;
         return true;
@@ -75,13 +85,13 @@ class git extends \Cz\Git\GitRepository
      * Function to retrieve all Commits for a specific file
      *
      * @param string $filename
+     * @param bool $last
      * @return array
      */
-    public function getCommitFile(string $filename, $last = false) : array
+    public function getCommitFile(string $filename, $last = false): array
     {
         $this->begin();
-        if($last)
-        {
+        if ($last) {
             exec($this->_binary . ' log -n 1 --format="%H;%ct;%an;%s" -- "' . $filename . '" 2>&1', $output);
         } else {
             exec($this->_binary . ' log --format="%H;%ct;%an;%s" -- "' . $filename . '" 2>&1', $output);
@@ -90,11 +100,9 @@ class git extends \Cz\Git\GitRepository
 
         $commits = [];
 
-        foreach($output as $commitData)
-        {
-            if(strpos($commitData, ';') !== false)
-            {
-                list($commit, $timestamp, $author, $message) = \explode(';', $commitData, 4);
+        foreach ($output as $commitData) {
+            if (strpos($commitData, ';') !== false) {
+                list($commit, $timestamp, $author, $message) = explode(';', $commitData, 4);
                 $commits[] = [
                     'commit' => $commit,
                     'timestamp' => $timestamp,
@@ -111,19 +119,19 @@ class git extends \Cz\Git\GitRepository
      * Retrieve the Hash of a specific file, false if none found
      *
      * @param string $filename
-     * @return string
+     * @return false|mixed
      */
-    public function getFileHash(string $filename) : string
+    public function getFileHash(string $filename)
     {
         $this->begin();
         exec($this->_binary . ' ls-tree HEAD "' . $filename . '" 2>&1', $output);
         $this->end();
 
-        if(count($output) == 0)
+        if (count($output) == 0) {
             return false;
+        }
 
-        if(preg_match('/\d+ .* ([0-9a-f]+)\t.*$/', $output[0], $matches))
-        {
+        if (preg_match('/\d+ .* ([0-9a-f]+)\t.*$/', $output[0], $matches)) {
             return $matches[1];
         } else {
             return false;
@@ -136,17 +144,23 @@ class git extends \Cz\Git\GitRepository
      * @param string $filename
      * @param string $commita
      * @param string $commitb
+     * @param bool $full
      * @return string
      */
-    public function getCommitDiffFile(string $filename, string $commita, string $commitb, bool $full = true) : string
+    public function getCommitDiffFile(string $filename, string $commita, string $commitb, bool $full = true): string
     {
         $this->begin();
         exec($this->_binary . ' diff ' . $commita . ' ' . $commitb . ' -- ' . $filename . " 2>&1", $output);
         $this->end();
 
-        if(strpos($output[2], $filename) !== false and strpos($output[3], $filename) !== false)
-        {
-            if(!$full) return implode(PHP_EOL, array_slice($output, 4));
+        if (count($output) < 4) {
+            return false;
+        }
+
+        if (strpos($output[2], $filename) !== false and strpos($output[3], $filename) !== false) {
+            if (!$full) {
+                return implode(PHP_EOL, array_slice($output, 4));
+            }
 
             return implode(PHP_EOL, $output);
         }
@@ -161,7 +175,7 @@ class git extends \Cz\Git\GitRepository
      * @param string $commit
      * @return string
      */
-    public function getFileFromCommit(string $filename, string $commit) : string
+    public function getFileFromCommit(string $filename, string $commit): string
     {
         $this->begin();
         exec($this->_binary . ' show ' . $commit . ':' . $filename . ' 2>&1', $output);
@@ -176,7 +190,7 @@ class git extends \Cz\Git\GitRepository
      * @param string $hash
      * @return string
      */
-    public function getFileFromHash(string $hash) : string
+    public function getFileFromHash(string $hash): string
     {
         $this->begin();
         exec($this->_binary . ' show ' . $hash . ' 2>&1', $output);
@@ -192,7 +206,7 @@ class git extends \Cz\Git\GitRepository
      * @param string $date
      * @return string
      */
-    public function getCommitFileAtDate(string $filename, string $date) : string
+    public function getCommitFileAtDate(string $filename, string $date): string
     {
         $this->begin();
         exec($this->_binary . ' log -1 --format="%H;%ct;%s" --until ' . $date . ' -- "' . $filename . '"', $output);
@@ -207,17 +221,18 @@ class git extends \Cz\Git\GitRepository
      * @param string $date
      * @return string
      */
-    public function getCommitAtDate(string $date) : string
+    public function getCommitAtDate(string $date): string
     {
         return $this->getCommitFileAtDate("", $date);
     }
 
-     /**
+    /**
      * Retrieve all Files recursively that exists in this Repository.
      *
+     * @param bool $returnflat
      * @return array
      */
-    public function getAllFiles(bool $returnflat = false) : array
+    public function getAllFiles(bool $returnflat = false): array
     {
         $this->begin();
         exec($this->_binary . ' ls-files 2>&1', $output);
@@ -234,16 +249,18 @@ class git extends \Cz\Git\GitRepository
      * @param boolean $returnflat
      * @return array
      */
-    public function getAllFilesFiltered(string $search, bool $regex = false, bool $returnflat = false) : array
+    public function getAllFilesFiltered(string $search, bool $regex = false, bool $returnflat = false): array
     {
         $allPrefilteredFiles = $this->getAllFiles(true);
         $allFiles = [];
 
-        foreach($allPrefilteredFiles as $file)
-        {
-            if( ($regex and preg_match('/' . str_replace('/', '\/', $search). '/', $file))
-             or (!$regex and strpos($file, $search)) )
+        foreach ($allPrefilteredFiles as $file) {
+            if (
+                ($regex and preg_match('/' . str_replace('/', '\/', $search) . '/', $file))
+                or (!$regex and strpos($file, $search))
+            ) {
                 $allFiles[] = $file;
+            }
         }
 
         return ($returnflat) ? $allFiles : $this->_flatToArray($allFiles);
