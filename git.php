@@ -88,14 +88,17 @@ class git extends GitRepository
      * @param bool $last
      * @return array
      */
-    public function getCommitFile(string $filename, $last = false): array
+    public function getCommitFile(string $filename, bool $last = false, ?int $since = null): array
     {
+        $command = sprintf(
+            '%s log %s --format="%%H;%%ct;%%an;%%s" %s -- "%s" 2>&1',
+            $this->_binary,
+            $last ? '-n 1' : '',
+            ($since !== null and is_integer($since)) ? '--since ' . $since : '',
+            $filename
+        );
         $this->begin();
-        if ($last) {
-            exec($this->_binary . ' log -n 1 --format="%H;%ct;%an;%s" -- "' . $filename . '" 2>&1', $output);
-        } else {
-            exec($this->_binary . ' log --format="%H;%ct;%an;%s" -- "' . $filename . '" 2>&1', $output);
-        }
+        exec($command, $output);
         $this->end();
 
         $commits = [];
