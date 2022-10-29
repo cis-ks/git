@@ -1,0 +1,17 @@
+{
+  "name": "cis/git",
+  "type": "library",
+  "authors": [
+    {
+      "name": "cisbadvilbel",
+      "email": "kay.schroeder@cis-gotha.de"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "cis\\git\\": "src"
+    }
+  },
+  "require": {
+  }
+}
