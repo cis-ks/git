@@ -153,7 +153,7 @@ class git extends GitRepository
     public function getCommitDiffFile(string $filename, string $commita, string $commitb, bool $full = true): string
     {
         $this->begin();
-        exec($this->_binary . ' diff ' . $commita . ' ' . $commitb . ' -- ' . $filename . " 2>&1", $output);
+        exec($this->_binary . ' diff ' . $commita . ' ' . $commitb . ' -- "' . $filename . '" 2>&1', $output);
         $this->end();
 
         if (count($output) < 4) {
@@ -181,7 +181,7 @@ class git extends GitRepository
     public function getFileFromCommit(string $filename, string $commit): string
     {
         $this->begin();
-        exec($this->_binary . ' show ' . $commit . ':' . $filename . ' 2>&1', $output);
+        exec($this->_binary . ' show ' . $commit . ':"' . $filename . '" 2>&1', $output);
         $this->end();
 
         return implode(PHP_EOL, $output);
