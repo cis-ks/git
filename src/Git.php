@@ -2,7 +2,9 @@
 
 namespace cis\git;
 
-use Cz\Git\GitRepository;
+use CzProject\GitPhp\GitException;
+use CzProject\GitPhp\GitRepository;
+
 use function explode;
 
 /**
@@ -19,18 +21,18 @@ use function explode;
  * @version 1.0.0
  * @requires Cz\Git\GitRepository
  */
-class git extends GitRepository
+class Git extends GitRepository
 {
-    protected $_binary = 'git';
+    protected $binary = 'git';
 
     /**
-     * Convert an Array of Flat File-Information into an
+     * Convert an Array of Flat File-Information into a
      * multidimensional array of directories and files.
      *
      * @param array $gitoutput
      * @return array
      */
-    protected function _flatToArray(array $gitoutput): array
+    protected function flatToArray(array $gitoutput): array
     {
         $return = [];
 
@@ -57,53 +59,30 @@ class git extends GitRepository
     }
 
     /**
-     * Set the Binary of Git.
-     *
-     * This setting can be used to use different git-binary or using another
-     * helper executable (i.e.) to perform caching or so.
-     *
-     * @param string $binary
-     * @return boolean
-     */
-    public function setBinary(string $binary): bool
-    {
-        $sanitize = (strpos($binary, ';') === false);
-
-        if (
-            !array_reduce($sanitize, function ($x, $y) {
-                return $x && $y;
-            }, true)
-        ) {
-            return false;
-        }
-
-        $this->_binary = $binary;
-        return true;
-    }
-
-    /**
      * Function to retrieve all Commits for a specific file
      *
      * @param string $filename
      * @param bool $last
+     * @param int|null $since
      * @return array
+     * @throws GitException
      */
     public function getCommitFile(string $filename, bool $last = false, ?int $since = null): array
     {
-        $command = sprintf(
-            '%s log %s --format="%%H;%%ct;%%an;%%s" %s -- "%s" 2>&1',
-            $this->_binary,
-            $last ? '-n 1' : '',
-            ($since !== null and is_integer($since)) ? '--since ' . $since : '',
-            $filename
-        );
-        $this->begin();
-        exec($command, $output);
-        $this->end();
+        $command = ['log'];
+        if ($last) {
+            array_push($command, '-n', '1');
+        }
+        $command[] = '--format="%%H;%%ct;%%an;%%s"';
+        if ($since !== null) {
+            $command[] = '--since';
+        }
+        array_push($command, '--', $filename, '2>&1');
+        $result = $this->run($command);
 
         $commits = [];
 
-        foreach ($output as $commitData) {
+        foreach ($result->getOutput() as $commitData) {
             if (strpos($commitData, ';') !== false) {
                 list($commit, $timestamp, $author, $message) = explode(';', $commitData, 4);
                 $commits[] = [
@@ -122,19 +101,18 @@ class git extends GitRepository
      * Retrieve the Hash of a specific file, false if none found
      *
      * @param string $filename
-     * @return false|mixed
+     * @return false|string
+     * @throws GitException
      */
     public function getFileHash(string $filename)
     {
-        $this->begin();
-        exec($this->_binary . ' ls-tree HEAD "' . $filename . '" 2>&1', $output);
-        $this->end();
+        $result = $this->run(['ls-tree', 'HEAD', $filename, '2>&1']);
 
-        if (count($output) == 0) {
+        if (empty($result->getOutput())) {
             return false;
         }
 
-        if (preg_match('/\d+ .* ([0-9a-f]+)\t.*$/', $output[0], $matches)) {
+        if (preg_match('/\d+ .* ([0-9a-f]+)\t.*$/', $result->getOutput()[0], $matches)) {
             return $matches[1];
         } else {
             return false;
@@ -149,23 +127,20 @@ class git extends GitRepository
      * @param string $commitb
      * @param bool $full
      * @return string
+     * @throws GitException
      */
     public function getCommitDiffFile(string $filename, string $commita, string $commitb, bool $full = true): string
     {
-        $this->begin();
-        exec($this->_binary . ' diff ' . $commita . ' ' . $commitb . ' -- "' . $filename . '" 2>&1', $output);
-        $this->end();
+        $result = $this->run(['diff', $commita, $commitb, '--', $filename, '2>&1']);
 
-        if (count($output) < 4) {
-            return false;
-        }
-
-        if (strpos($output[2], $filename) !== false and strpos($output[3], $filename) !== false) {
-            if (!$full) {
-                return implode(PHP_EOL, array_slice($output, 4));
-            }
-
-            return implode(PHP_EOL, $output);
+        if (
+            count($result->getOutput()) >= 4
+            && strpos($result->getOutput()[2], $filename) !== false
+            && strpos($result->getOutput()[3], $filename) !== false
+        ) {
+            return !$full
+                ? implode(PHP_EOL, array_slice($result->getOutput(), 4))
+                : implode(PHP_EOL, $result->getOutput());
         }
 
         return false;
@@ -177,14 +152,12 @@ class git extends GitRepository
      * @param string $filename
      * @param string $commit
      * @return string
+     * @throws GitException
      */
     public function getFileFromCommit(string $filename, string $commit): string
     {
-        $this->begin();
-        exec($this->_binary . ' show ' . $commit . ':"' . $filename . '" 2>&1', $output);
-        $this->end();
-
-        return implode(PHP_EOL, $output);
+        $result = $this->run(['show', sprintf('%s:"%s"', $commit, $filename), '2>&1']);
+        return $result->getOutputAsString();
     }
 
     /**
@@ -192,14 +165,11 @@ class git extends GitRepository
      *
      * @param string $hash
      * @return string
+     * @throws GitException
      */
     public function getFileFromHash(string $hash): string
     {
-        $this->begin();
-        exec($this->_binary . ' show ' . $hash . ' 2>&1', $output);
-        $this->end();
-
-        return implode(PHP_EOL, $output);
+        return $this->run(['show', $hash, '2>&1'])->getOutputAsString();
     }
 
     /**
@@ -208,14 +178,11 @@ class git extends GitRepository
      * @param string $filename
      * @param string $date
      * @return string
+     * @throws GitException
      */
     public function getCommitFileAtDate(string $filename, string $date): string
     {
-        $this->begin();
-        exec($this->_binary . ' log -1 --format="%H;%ct;%s" --until ' . $date . ' -- "' . $filename . '"', $output);
-        $this->end();
-
-        return $output[0];
+        return $this->run(['log', '-1', '--format="%H;%ct;%s"', '--until', $date, '--', $filename])->getOutput()[0];
     }
 
     /**
@@ -223,6 +190,7 @@ class git extends GitRepository
      *
      * @param string $date
      * @return string
+     * @throws GitException
      */
     public function getCommitAtDate(string $date): string
     {
@@ -234,14 +202,13 @@ class git extends GitRepository
      *
      * @param bool $returnflat
      * @return array
+     * @throws GitException
      */
     public function getAllFiles(bool $returnflat = false): array
     {
-        $this->begin();
-        exec($this->_binary . ' ls-files 2>&1', $output);
-        $this->end();
+        $result = $this->run(['ls-files', '2>&1']);
 
-        return ($returnflat) ? $output : $this->_flatToArray($output);
+        return $returnflat ? $result->getOutput() : $this->flatToArray($result->getOutput());
     }
 
     /**
@@ -251,6 +218,7 @@ class git extends GitRepository
      * @param boolean $regex
      * @param boolean $returnflat
      * @return array
+     * @throws GitException
      */
     public function getAllFilesFiltered(string $search, bool $regex = false, bool $returnflat = false): array
     {
@@ -259,32 +227,27 @@ class git extends GitRepository
 
         foreach ($allPrefilteredFiles as $file) {
             if (
-                ($regex and preg_match('/' . str_replace('/', '\/', $search) . '/', $file))
-                or (!$regex and strpos($file, $search))
+                ($regex && preg_match('/' . str_replace('/', '\/', $search) . '/', $file))
+                || (!$regex && strpos($file, $search))
             ) {
                 $allFiles[] = $file;
             }
         }
 
-        return ($returnflat) ? $allFiles : $this->_flatToArray($allFiles);
+        return ($returnflat) ? $allFiles : $this->flatToArray($allFiles);
     }
 
     /**
      * Check if a given GIT-Repository is initialized
      *
      * @return bool
+     * @throws GitException
      */
     public function isInitalized(): bool
     {
-        $this->begin();
-        exec($this->_binary . ' status', $output);
-        $this->end();
+        $result = $this->run(['status']);
 
-        if (preg_grep('/fatal: not a git repository/', $output)) {
-            return false;
-        } else {
-            return true;
-        }
+        return !preg_grep('/fatal: not a git repository/', $result->getOutput());
     }
 
     /**
@@ -294,10 +257,6 @@ class git extends GitRepository
      */
     public function isRootDirectoy(): bool
     {
-        $this->begin();
-        $gitexists = is_dir('.git');
-        $this->end();
-
-        return $gitexists;
+        return is_dir(rtrim($this->repository, '/') . '/.git');
     }
 }
