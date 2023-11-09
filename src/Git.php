@@ -5,6 +5,8 @@ namespace cis\git;
 use CzProject\GitPhp\GitException;
 use CzProject\GitPhp\GitRepository;
 
+use CzProject\GitPhp\RunnerResult;
+use CzProject\GitPhp\Runners\CliRunner;
 use function explode;
 
 /**
@@ -255,8 +257,36 @@ class Git extends GitRepository
      *
      * @return bool
      */
-    public function isRootDirectoy(): bool
+    public function isRootDirectory(): bool
     {
         return is_dir(rtrim($this->repository, '/') . '/.git');
+    }
+
+    /**
+     * @param string $directory
+     * @param array|null $params
+     * @param string|null $gitBinary
+     * @return RunnerResult
+     * @throws GitException
+     */
+    public static function init(string $directory, ?array $params = null, ?string $gitBinary = 'git'): RunnerResult
+    {
+        if (is_dir(rtrim($directory, '/') . '/.git')) {
+            throw new GitException("Repo already exists in $directory");
+        }
+
+        if (!is_dir($directory) && !mkdir($directory, 0777, true)) {
+            throw new GitException("Unable to create directory '$directory'");
+        }
+
+        $cli = new CliRunner($gitBinary);
+
+        $result = $cli->run($directory, array_merge(['init', $params]));
+
+        if ($result->getExitCode() !== 0) {
+            throw new GitException("Git init failed (directory $directory)");
+        }
+
+        return $result;
     }
 }
