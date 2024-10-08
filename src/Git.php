@@ -1,16 +1,18 @@
 <?php
 
+/** @noinspection PhpUnused */
+
 namespace cis\git;
 
 use CzProject\GitPhp\GitException;
 use CzProject\GitPhp\GitRepository;
-
 use CzProject\GitPhp\RunnerResult;
 use CzProject\GitPhp\Runners\CliRunner;
+
 use function explode;
 
 /**
- * git-class to extend the CZproject Git-Repository-Class
+ * Git-class to extend the CZproject Git-Repository-Class
  * (https://github.com/czproject/git-php)
  *
  * Original License: New BSD License,
@@ -31,14 +33,14 @@ class Git extends GitRepository
      * Convert an Array of Flat File-Information into a
      * multidimensional array of directories and files.
      *
-     * @param array $gitoutput
+     * @param array $gitOutput
      * @return array
      */
-    protected function flatToArray(array $gitoutput): array
+    protected function flatToArray(array $gitOutput): array
     {
         $return = [];
 
-        foreach ($gitoutput as $line) {
+        foreach ($gitOutput as $line) {
             $l = $line;
             $r = &$return;
             $k = '.';
@@ -122,18 +124,18 @@ class Git extends GitRepository
     }
 
     /**
-     * Function to retrieve the diff for a given file and two commits.
+     * Function to retrieve the diff for a given file, and two commits.
      *
      * @param string $filename
-     * @param string $commita
-     * @param string $commitb
+     * @param string $commitA
+     * @param string $commitB
      * @param bool $full
      * @return string
      * @throws GitException
      */
-    public function getCommitDiffFile(string $filename, string $commita, string $commitb, bool $full = true): string
+    public function getCommitDiffFile(string $filename, string $commitA, string $commitB, bool $full = true): string
     {
-        $result = $this->run(['diff', $commita, $commitb, '--', $filename, '2>&1']);
+        $result = $this->run(['diff', $commitA, $commitB, '--', $filename, '2>&1']);
 
         if (
             count($result->getOutput()) >= 4
@@ -202,15 +204,15 @@ class Git extends GitRepository
     /**
      * Retrieve all Files recursively that exists in this Repository.
      *
-     * @param bool $returnflat
+     * @param bool $returnFlat
      * @return array
      * @throws GitException
      */
-    public function getAllFiles(bool $returnflat = false): array
+    public function getAllFiles(bool $returnFlat = false): array
     {
         $result = $this->run(['ls-files', '2>&1']);
 
-        return $returnflat ? $result->getOutput() : $this->flatToArray($result->getOutput());
+        return $returnFlat ? $result->getOutput() : $this->flatToArray($result->getOutput());
     }
 
     /**
@@ -218,11 +220,11 @@ class Git extends GitRepository
      *
      * @param string $search
      * @param boolean $regex
-     * @param boolean $returnflat
+     * @param boolean $returnFlat
      * @return array
      * @throws GitException
      */
-    public function getAllFilesFiltered(string $search, bool $regex = false, bool $returnflat = false): array
+    public function getAllFilesFiltered(string $search, bool $regex = false, bool $returnFlat = false): array
     {
         $allPrefilteredFiles = $this->getAllFiles(true);
         $allFiles = [];
@@ -236,7 +238,7 @@ class Git extends GitRepository
             }
         }
 
-        return ($returnflat) ? $allFiles : $this->flatToArray($allFiles);
+        return ($returnFlat) ? $allFiles : $this->flatToArray($allFiles);
     }
 
     /**
@@ -245,11 +247,9 @@ class Git extends GitRepository
      * @return bool
      * @throws GitException
      */
-    public function isInitalized(): bool
+    public function isInitialized(): bool
     {
-        $result = $this->run(['status']);
-
-        return !preg_grep('/fatal: not a git repository/', $result->getOutput());
+        return !preg_grep('/fatal: not a git repository/', $this->run(['status'])->getOutput());
     }
 
     /**
@@ -279,9 +279,7 @@ class Git extends GitRepository
             throw new GitException("Unable to create directory '$directory'");
         }
 
-        $cli = new CliRunner($gitBinary);
-
-        $result = $cli->run($directory, array_merge(['init', $params]));
+        $result = (new CliRunner($gitBinary))->run($directory, array_merge(['init', $params]));
 
         if ($result->getExitCode() !== 0) {
             throw new GitException("Git init failed (directory $directory)");

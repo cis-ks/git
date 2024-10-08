@@ -13,6 +13,6 @@
         }
     },
     "require": {
-        "czproject/git-php": "^v4"
+        "czproject/git-php": "^v4.3.0"
     }
 }
